@@ -1,27 +1,20 @@
 from flask import Flask, render_template, request, redirect, session, send_file
 import pandas as pd
-import io
 import os
-import base64
+import uuid
+import io
 
 app = Flask(__name__)
-app.secret_key = "placement_project_secret_key"
+app.secret_key = "placement_ready_project_key"
+
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
-def load_dataframe():
-    if "csv_data" in session:
-        try:
-            decoded = base64.b64decode(session["csv_data"])
-            return pd.read_csv(io.BytesIO(decoded))
-        except:
-            return None
+def get_user_file():
+    if "file_id" in session:
+        return os.path.join(UPLOAD_FOLDER, f"{session['file_id']}.csv")
     return None
-
-
-def save_dataframe(df):
-    buffer = io.BytesIO()
-    df.to_csv(buffer, index=False)
-    session["csv_data"] = base64.b64encode(buffer.getvalue()).decode()
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -35,11 +28,13 @@ def index():
     values = []
     chart_type = "bar"
 
-    df = load_dataframe()
+    file_path = get_user_file()
+    df = None
 
-    # =========================
-    # HANDLE POST ACTIONS
-    # =========================
+    # Load existing user file
+    if file_path and os.path.exists(file_path):
+        df = pd.read_csv(file_path)
+
     if request.method == "POST":
 
         # Upload CSV
@@ -56,15 +51,20 @@ def index():
                         error_message = "Uploaded CSV is empty."
                         df = None
                     else:
-                        save_dataframe(df)
+                        file_id = str(uuid.uuid4())
+                        session["file_id"] = file_id
+                        file_path = os.path.join(UPLOAD_FOLDER, f"{file_id}.csv")
+                        df.to_csv(file_path, index=False)
 
                 except Exception as e:
-                    error_message = f"Invalid CSV file: {str(e)}"
+                    error_message = f"Invalid CSV: {str(e)}"
                     df = None
 
-        # Reset Data
+        # Reset
         if "reset" in request.form:
-            session.pop("csv_data", None)
+            if file_path and os.path.exists(file_path):
+                os.remove(file_path)
+            session.pop("file_id", None)
             return redirect("/")
 
         # Sort
@@ -75,7 +75,7 @@ def index():
             if column in df.columns:
                 df[column] = pd.to_numeric(df[column], errors="coerce")
                 df = df.sort_values(by=column, ascending=(order == "asc"))
-                save_dataframe(df)
+                df.to_csv(file_path, index=False)
 
         # Analyze
         if "analyze" in request.form and df is not None:
@@ -113,7 +113,6 @@ def index():
                 download_name="processed_data.csv"
             )
 
-    # Prepare data for display
     if df is not None:
         numeric_columns = df.select_dtypes(include=["number"]).columns.tolist()
         table = df.to_html(classes="table", index=False)
