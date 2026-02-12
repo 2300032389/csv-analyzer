@@ -50,42 +50,33 @@ def index():
             df = None
             return redirect("/")
 
-        # Sort
+        # ===== ADVANCED SORTING =====
         if "sort" in request.form and df is not None:
-            column = request.form.get("sort_column")
+
+            sort_type = request.form.get("sort_type")
             order = request.form.get("sort_order")
 
-            if column in df.columns:
-                df[column] = pd.to_numeric(df[column], errors="coerce")
-                df = df.sort_values(by=column, ascending=(order == "asc"))
-
-        # Analyze
-        if "analyze" in request.form and df is not None:
-            selected_columns = request.form.getlist("columns")
-            chart_type = request.form.get("chart_type", "bar")
-
-            if selected_columns:
-                numeric_data = df[selected_columns].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-
-                stats = {}
-                for col in selected_columns:
-                    column_data = numeric_data[col].dropna()
-                    if not column_data.empty:
-                        stats[col] = {
-                            "average": round(column_data.mean(), 2),
-                            "highest": column_data.max(),
-                            "lowest": column_data.min()
-                        }
-
-                labels = df.index.astype(str).tolist()
-                values = numeric_data.fillna(0).values.tolist()
-
-        # Correlation Heatmap
-        if "heatmap" in request.form and df is not None:
             numeric_df = df.select_dtypes(include=[np.number])
 
+            if sort_type == "column":
+                column = request.form.get("sort_column")
+                if column in df.columns:
+                    df[column] = pd.to_numeric(df[column], errors="coerce")
+                    df = df.sort_values(by=column, ascending=(order == "asc"))
+
+            elif sort_type == "row_avg" and not numeric_df.empty:
+                df["__row_avg__"] = numeric_df.mean(axis=1)
+                df = df.sort_values(by="__row_avg__", ascending=(order == "asc"))
+                df.drop(columns=["__row_avg__"], inplace=True)
+
+            elif sort_type == "row_max" and not numeric_df.empty:
+                df["__row_max__"] = numeric_df.max(axis=1)
+                df = df.sort_values(by="__row_max__", ascending=(order == "asc"))
+                df.drop(columns=["__row_max__"], inplace=True)
+
+        # Heatmap
+        if "heatmap" in request.form and df is not None:
+            numeric_df = df.select_dtypes(include=[np.number])
             if not numeric_df.empty:
                 corr_matrix = numeric_df.corr().round(2)
                 heatmap_labels = corr_matrix.columns.tolist()
@@ -104,7 +95,7 @@ def index():
                 download_name="processed_data.csv"
             )
 
-    # ===== PREPARE DISPLAY DATA =====
+    # ===== DISPLAY DATA =====
     if df is not None:
 
         numeric_columns = df.select_dtypes(include=["number"]).columns.tolist()
@@ -117,45 +108,31 @@ def index():
             "missing": int(df.isnull().sum().sum())
         }
 
-        # ===== AUTOMATIC INSIGHTS =====
+        # ===== INSIGHTS =====
         insights = {}
 
-        # 1️⃣ Column with most missing values
         missing_series = df.isnull().sum()
         max_missing_col = missing_series.idxmax()
-        max_missing_value = int(missing_series.max())
+        insights["most_missing"] = f"{max_missing_col} ({int(missing_series.max())})"
 
-        insights["most_missing"] = f"{max_missing_col} ({max_missing_value} missing values)"
-
-        # 2️⃣ Correlation insights
         numeric_df = df.select_dtypes(include=[np.number])
 
         if len(numeric_df.columns) > 1:
             corr_matrix = numeric_df.corr()
-
-            # Remove self-correlation
             corr_matrix.values[[np.arange(len(corr_matrix))]*2] = np.nan
-
             max_corr = corr_matrix.unstack().dropna().idxmax()
             min_corr = corr_matrix.unstack().dropna().idxmin()
-
             insights["strongest_positive"] = f"{max_corr[0]} & {max_corr[1]}"
             insights["strongest_negative"] = f"{min_corr[0]} & {min_corr[1]}"
 
-        # 3️⃣ Highest variance column
         if len(numeric_df.columns) > 0:
             variance_series = numeric_df.var()
-            max_variance_col = variance_series.idxmax()
-            insights["highest_variance"] = max_variance_col
+            insights["highest_variance"] = variance_series.idxmax()
 
     return render_template(
         "index.html",
         table=table,
-        stats=stats,
         numeric_columns=numeric_columns,
-        labels=labels,
-        values=values,
-        chart_type=chart_type,
         error_message=error_message,
         kpis=kpis,
         heatmap_labels=heatmap_labels,

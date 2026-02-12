@@ -5,20 +5,19 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f5f7fa; margin: 0; }
+        body { font-family: 'Segoe UI'; background: #f5f7fa; margin: 0; }
         .header { background: linear-gradient(90deg, #0072ff, #00c6ff); color: white; padding: 25px; text-align: center; }
         .container { width: 90%; margin: 30px auto; }
         .card { background: white; padding: 20px; margin-bottom: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
         .kpi-container { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 25px; }
-        .kpi-box { flex: 1; min-width: 180px; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.08); background: white; }
+        .kpi-box { flex: 1; min-width: 180px; padding: 20px; border-radius: 12px; text-align: center; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
         .kpi-box h2 { margin: 0; color: #0072ff; }
-        input, select, button { padding: 8px 12px; margin: 6px 4px; border-radius: 8px; border: 1px solid #ddd; }
-        button { background: #0072ff; color: white; border: none; cursor: pointer; }
+        button { background: #0072ff; color: white; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
         button:hover { opacity: 0.9; }
+        select { padding: 8px; border-radius: 8px; border: 1px solid #ddd; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 8px; border: 1px solid #eee; }
         th { background: #f0f4f8; }
-        .error { color: red; font-weight: bold; }
         .insight-box { background: #eef6ff; padding: 15px; border-radius: 8px; margin: 10px 0; }
     </style>
 </head>
@@ -31,15 +30,11 @@
 
 <div class="container">
 
-{% if error_message %}
-<p class="error">{{ error_message }}</p>
-{% endif %}
-
 {% if not table %}
 <div class="card">
     <h2>Upload CSV</h2>
     <form method="POST" enctype="multipart/form-data">
-        <input type="file" name="csv_file" accept=".csv" required>
+        <input type="file" name="csv_file" required>
         <button name="upload_csv">Upload</button>
     </form>
 </div>
@@ -56,42 +51,47 @@
 
 <div class="card">
     <h2>🧠 Automatic Insights</h2>
+    <div class="insight-box"><strong>Most Missing:</strong> {{ insights.most_missing }}</div>
+    <div class="insight-box"><strong>Strongest Positive:</strong> {{ insights.strongest_positive }}</div>
+    <div class="insight-box"><strong>Strongest Negative:</strong> {{ insights.strongest_negative }}</div>
+    <div class="insight-box"><strong>Highest Variance:</strong> {{ insights.highest_variance }}</div>
+</div>
 
-    <div class="insight-box">
-        <strong>Most Missing Values:</strong> {{ insights.most_missing }}
-    </div>
+<div class="card">
+    <h2>Advanced Sorting</h2>
+    <form method="POST">
+        <select name="sort_type">
+            <option value="column">Sort by Column</option>
+            <option value="row_avg">Sort by Row Average</option>
+            <option value="row_max">Sort by Row Maximum</option>
+        </select>
 
-    <div class="insight-box">
-        <strong>Strongest Positive Correlation:</strong> {{ insights.strongest_positive }}
-    </div>
+        <select name="sort_column">
+            {% for col in numeric_columns %}
+            <option value="{{ col }}">{{ col }}</option>
+            {% endfor %}
+        </select>
 
-    <div class="insight-box">
-        <strong>Strongest Negative Correlation:</strong> {{ insights.strongest_negative }}
-    </div>
+        <select name="sort_order">
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
+        </select>
 
-    <div class="insight-box">
-        <strong>Highest Variance Column:</strong> {{ insights.highest_variance }}
-    </div>
+        <button name="sort">Sort</button>
+    </form>
 </div>
 
 <div class="card">
     <form method="POST" style="display:inline;">
-        <button name="reset">Reset</button>
+        <button name="heatmap">Show Correlation Heatmap</button>
     </form>
     <form method="POST" style="display:inline;">
         <button name="download">Download CSV</button>
     </form>
     <form method="POST" style="display:inline;">
-        <button name="heatmap">Show Correlation Heatmap</button>
+        <button name="reset">Reset</button>
     </form>
 </div>
-
-{% if heatmap_values %}
-<div class="card">
-    <h2>Correlation Heatmap</h2>
-    <canvas id="heatmapChart"></canvas>
-</div>
-{% endif %}
 
 <div class="card">
     <h2>Data Preview</h2>
@@ -101,26 +101,6 @@
 {% endif %}
 
 </div>
-
-<script>
-    const heatmapLabels = JSON.parse('{{ heatmap_labels | tojson | safe }}');
-    const heatmapValues = JSON.parse('{{ heatmap_values | tojson | safe }}');
-
-    if (heatmapValues.length > 0) {
-        const datasets = heatmapValues.map((row, index) => ({
-            label: heatmapLabels[index],
-            data: row
-        }));
-
-        new Chart(document.getElementById('heatmapChart'), {
-            type: 'bar',
-            data: {
-                labels: heatmapLabels,
-                datasets: datasets
-            }
-        });
-    }
-</script>
 
 </body>
 </html>
