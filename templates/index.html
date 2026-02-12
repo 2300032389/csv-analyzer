@@ -88,7 +88,7 @@
 </div>
 {% endif %}
 
-<!-- Upload CSV -->
+<!-- UPLOAD CSV -->
 <div class="card">
 <h2>Upload CSV</h2>
 <form method="POST" enctype="multipart/form-data">
@@ -97,8 +97,33 @@
 </form>
 </div>
 
-<!-- Column Selection -->
 {% if numeric_columns %}
+
+<!-- SORTING -->
+<div class="card">
+<h2>Sort Data</h2>
+<form method="POST" enctype="multipart/form-data">
+    <input type="file" name="csv_file" accept=".csv" required>
+
+    <br>
+
+    <label>Sort By:</label>
+    <select name="sort_column">
+        {% for col in numeric_columns %}
+        <option value="{{ col }}">{{ col }}</option>
+        {% endfor %}
+    </select>
+
+    <select name="sort_order">
+        <option value="asc">Ascending</option>
+        <option value="desc">Descending</option>
+    </select>
+
+    <button name="sort">Sort</button>
+</form>
+</div>
+
+<!-- ANALYSIS -->
 <div class="card">
 <h2>Select Columns to Analyze</h2>
 <form method="POST" enctype="multipart/form-data">
@@ -125,9 +150,10 @@
     <button name="analyze">Analyze</button>
 </form>
 </div>
+
 {% endif %}
 
-<!-- Statistics -->
+<!-- STATISTICS -->
 {% if stats %}
 <div class="card">
 <h2>Statistics</h2>
@@ -142,7 +168,7 @@ Lowest: {{ s.lowest }}
 </div>
 {% endif %}
 
-<!-- Data Preview -->
+<!-- DATA PREVIEW -->
 {% if table %}
 <div class="card">
 <h2>Data Preview</h2>
@@ -150,7 +176,7 @@ Lowest: {{ s.lowest }}
 </div>
 {% endif %}
 
-<!-- Chart -->
+<!-- CHART -->
 {% if values %}
 <div class="card">
 <h2>Visualization</h2>

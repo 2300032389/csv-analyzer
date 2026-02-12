@@ -23,16 +23,12 @@ def index():
 
         file = request.files.get("csv_file")
 
-        # =========================
-        # FILE VALIDATION
-        # =========================
         if not file or file.filename == "":
             error_message = "Please upload a CSV file."
         else:
             try:
                 df = pd.read_csv(file)
 
-                # Check if CSV has no columns
                 if df.shape[1] == 0:
                     error_message = "CSV file contains no columns."
                     df = None
@@ -44,6 +40,20 @@ def index():
             except Exception as e:
                 error_message = f"Invalid CSV file: {str(e)}"
                 df = None
+
+        # =========================
+        # SORTING
+        # =========================
+        if "sort" in request.form and df is not None:
+            sort_column = request.form.get("sort_column")
+            sort_order = request.form.get("sort_order")
+
+            if sort_column in df.columns:
+                df[sort_column] = pd.to_numeric(df[sort_column], errors="coerce")
+                df = df.sort_values(
+                    by=sort_column,
+                    ascending=(sort_order == "asc")
+                )
 
         # =========================
         # ANALYZE
@@ -89,7 +99,6 @@ def index():
                 download_name="processed_data.csv"
             )
 
-    # Detect numeric columns
     if df is not None:
         numeric_columns = df.select_dtypes(include=["number"]).columns.tolist()
         table = df.to_html(classes="table", index=False)
@@ -107,9 +116,6 @@ def index():
     )
 
 
-# =========================
-# PRODUCTION PORT CONFIG
-# =========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
