@@ -1,193 +1,216 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Universal CSV Analyzer</title>
+    <title>DataPilot - Smart CSV Intelligence</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #141e30, #243b55);
+            background: #f5f7fa;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: linear-gradient(90deg, #0072ff, #00c6ff);
             color: white;
+            padding: 25px;
             text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 32px;
         }
 
         .container {
             width: 90%;
-            margin: auto;
+            margin: 30px auto;
         }
 
         .card {
-            background: rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(10px);
+            background: white;
             padding: 20px;
-            margin: 20px 0;
-            border-radius: 15px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            margin-bottom: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         }
 
-        input, select {
-            padding: 8px;
-            margin: 5px;
+        .kpi-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 25px;
+        }
+
+        .kpi-box {
+            flex: 1;
+            min-width: 180px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+
+        .kpi-box h2 {
+            margin: 0;
+            color: #0072ff;
+        }
+
+        input, select, button {
+            padding: 8px 12px;
+            margin: 6px 4px;
             border-radius: 8px;
-            border: none;
+            border: 1px solid #ddd;
         }
 
         button {
-            padding: 8px 15px;
-            margin: 5px;
-            background: linear-gradient(to right, #00c6ff, #0072ff);
+            background: #0072ff;
             color: white;
             border: none;
-            border-radius: 8px;
             cursor: pointer;
-            transition: 0.3s;
         }
 
         button:hover {
-            transform: scale(1.05);
+            opacity: 0.9;
         }
 
         table {
-            margin: auto;
-            border-collapse: collapse;
             width: 100%;
-            color: white;
+            border-collapse: collapse;
         }
 
         th, td {
-            padding: 10px;
-            border: 1px solid rgba(255,255,255,0.2);
+            padding: 8px;
+            border: 1px solid #eee;
         }
 
         th {
-            background: rgba(255,255,255,0.1);
+            background: #f0f4f8;
         }
 
-        .error-card {
-            background: rgba(255,0,0,0.2);
+        .error {
+            color: red;
+            font-weight: bold;
         }
     </style>
 </head>
-
 <body>
+
+<div class="header">
+    <h1>DataPilot</h1>
+    <p>Smart CSV Intelligence Dashboard</p>
+</div>
 
 <div class="container">
 
-<h1>📊 Universal CSV Analyzer</h1>
-
-<!-- ERROR MESSAGE -->
 {% if error_message %}
-<div class="card error-card">
-    <p>{{ error_message }}</p>
-</div>
+<p class="error">{{ error_message }}</p>
 {% endif %}
-
-<!-- ========================= -->
-<!-- UPLOAD SECTION -->
-<!-- ========================= -->
 
 {% if not table %}
 <div class="card">
-<h2>Upload CSV File</h2>
-<form method="POST" enctype="multipart/form-data">
-    <input type="file" name="csv_file" accept=".csv" required>
-    <button name="upload_csv">Upload</button>
-</form>
+    <h2>Upload CSV</h2>
+    <form method="POST" enctype="multipart/form-data">
+        <input type="file" name="csv_file" accept=".csv" required>
+        <button name="upload_csv">Upload</button>
+    </form>
 </div>
 {% endif %}
-
-<!-- ========================= -->
-<!-- AFTER UPLOAD SECTION -->
-<!-- ========================= -->
 
 {% if table %}
 
-<div class="card">
-<h2>Actions</h2>
-
-<form method="POST" style="display:inline;">
-    <button name="reset" style="background:red;">Reset Data</button>
-</form>
-
-<form method="POST" style="display:inline;">
-    <button name="download">Download CSV</button>
-</form>
-
+<div class="kpi-container">
+    <div class="kpi-box">
+        <h2>{{ kpis.rows }}</h2>
+        <p>Total Rows</p>
+    </div>
+    <div class="kpi-box">
+        <h2>{{ kpis.columns }}</h2>
+        <p>Total Columns</p>
+    </div>
+    <div class="kpi-box">
+        <h2>{{ kpis.numeric_cols }}</h2>
+        <p>Numeric Columns</p>
+    </div>
+    <div class="kpi-box">
+        <h2>{{ kpis.missing }}</h2>
+        <p>Missing Values</p>
+    </div>
 </div>
 
-<!-- SORTING -->
 <div class="card">
-<h2>Sort Data</h2>
-<form method="POST">
-    <label>Sort By:</label>
-    <select name="sort_column">
+    <form method="POST" style="display:inline;">
+        <button name="reset">Reset</button>
+    </form>
+
+    <form method="POST" style="display:inline;">
+        <button name="download">Download CSV</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Sort Data</h2>
+    <form method="POST">
+        <select name="sort_column">
+            {% for col in numeric_columns %}
+            <option value="{{ col }}">{{ col }}</option>
+            {% endfor %}
+        </select>
+
+        <select name="sort_order">
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
+        </select>
+
+        <button name="sort">Sort</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Analyze Columns</h2>
+    <form method="POST">
         {% for col in numeric_columns %}
-        <option value="{{ col }}">{{ col }}</option>
+            <input type="checkbox" name="columns" value="{{ col }}"> {{ col }}
         {% endfor %}
-    </select>
 
-    <select name="sort_order">
-        <option value="asc">Ascending</option>
-        <option value="desc">Descending</option>
-    </select>
+        <br>
 
-    <button name="sort">Sort</button>
-</form>
+        <select name="chart_type">
+            <option value="bar">Bar</option>
+            <option value="line">Line</option>
+            <option value="pie">Pie</option>
+        </select>
+
+        <button name="analyze">Analyze</button>
+    </form>
 </div>
 
-<!-- ANALYSIS -->
-<div class="card">
-<h2>Analyze Columns</h2>
-<form method="POST">
-
-    {% for col in numeric_columns %}
-        <input type="checkbox" name="columns" value="{{ col }}"> {{ col }}
-    {% endfor %}
-
-    <br><br>
-
-    <label>Chart Type:</label>
-    <select name="chart_type">
-        <option value="bar">Bar</option>
-        <option value="line">Line</option>
-        <option value="pie">Pie</option>
-    </select>
-
-    <br><br>
-
-    <button name="analyze">Analyze</button>
-</form>
-</div>
-
-<!-- STATISTICS -->
 {% if stats %}
 <div class="card">
-<h2>Statistics</h2>
-{% for col, s in stats.items() %}
-<p>
-<b>{{ col }}</b> → 
-Average: {{ s.average }},
-Highest: {{ s.highest }},
-Lowest: {{ s.lowest }}
-</p>
-{% endfor %}
+    <h2>Statistics</h2>
+    {% for col, s in stats.items() %}
+        <p><strong>{{ col }}</strong> →
+        Avg: {{ s.average }},
+        Max: {{ s.highest }},
+        Min: {{ s.lowest }}</p>
+    {% endfor %}
 </div>
 {% endif %}
 
-<!-- DATA PREVIEW -->
-<div class="card">
-<h2>Data Preview</h2>
-{{ table | safe }}
-</div>
-
-<!-- CHART -->
 {% if values %}
 <div class="card">
-<h2>Visualization</h2>
-<canvas id="myChart"></canvas>
+    <h2>Visualization</h2>
+    <canvas id="myChart"></canvas>
 </div>
 {% endif %}
+
+<div class="card">
+    <h2>Data Preview</h2>
+    {{ table | safe }}
+</div>
 
 {% endif %}
 
@@ -199,14 +222,13 @@ Lowest: {{ s.lowest }}
     const chartType = "{{ chart_type }}";
 
     if (values.length > 0) {
-
         const datasets = [];
 
         for (let i = 0; i < values[0].length; i++) {
             datasets.push({
                 label: "Column " + (i + 1),
                 data: values.map(row => row[i]),
-                borderWidth: 1
+                borderWidth: 2
             });
         }
 

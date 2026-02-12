@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, send_file
 import pandas as pd
 import io
 import os
@@ -20,6 +20,7 @@ def index():
     labels = []
     values = []
     chart_type = "bar"
+    kpis = None
 
     if request.method == "POST":
 
@@ -78,9 +79,30 @@ def index():
                 labels = df.index.astype(str).tolist()
                 values = numeric_data.fillna(0).values.tolist()
 
+        # Download
+        if "download" in request.form and df is not None:
+            buffer = io.StringIO()
+            df.to_csv(buffer, index=False)
+            buffer.seek(0)
+
+            return send_file(
+                io.BytesIO(buffer.getvalue().encode()),
+                mimetype="text/csv",
+                as_attachment=True,
+                download_name="processed_data.csv"
+            )
+
+    # Prepare display data
     if df is not None:
         numeric_columns = df.select_dtypes(include=["number"]).columns.tolist()
         table = df.to_html(classes="table", index=False)
+
+        kpis = {
+            "rows": df.shape[0],
+            "columns": df.shape[1],
+            "numeric_cols": len(numeric_columns),
+            "missing": int(df.isnull().sum().sum())
+        }
 
     return render_template(
         "index.html",
@@ -90,7 +112,8 @@ def index():
         labels=labels,
         values=values,
         chart_type=chart_type,
-        error_message=error_message
+        error_message=error_message,
+        kpis=kpis
     )
 
 
