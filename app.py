@@ -15,72 +15,81 @@ def index():
     chart_type = "bar"
     labels = []
     values = []
+    error_message = None
 
     df = None
 
-    # =====================
-    # CSV Upload
-    # =====================
     if request.method == "POST":
 
-        if "upload_csv" in request.form:
-            file = request.files.get("csv_file")
+        file = request.files.get("csv_file")
 
-            if file and file.filename != "":
-                try:
-                    df = pd.read_csv(file)
-                except Exception as e:
-                    return f"Error reading file: {str(e)}"
-
-        # =====================
-        # Analyze
-        # =====================
-        if "analyze" in request.form:
-            file = request.files.get("csv_file")
-
-            if file and file.filename != "":
+        # =========================
+        # FILE VALIDATION
+        # =========================
+        if not file or file.filename == "":
+            error_message = "Please upload a CSV file."
+        else:
+            try:
                 df = pd.read_csv(file)
 
-            if df is not None:
-                selected_columns = request.form.getlist("columns")
-                chart_type = request.form.get("chart_type", "bar")
+                # Check if CSV has no columns
+                if df.shape[1] == 0:
+                    error_message = "CSV file contains no columns."
+                    df = None
 
-                if selected_columns:
-                    numeric_data = df[selected_columns].apply(pd.to_numeric, errors="coerce")
+            except pd.errors.EmptyDataError:
+                error_message = "Uploaded CSV is empty."
+                df = None
 
-                    stats = {}
-                    for col in selected_columns:
-                        column_data = numeric_data[col].dropna()
+            except Exception as e:
+                error_message = f"Invalid CSV file: {str(e)}"
+                df = None
+
+        # =========================
+        # ANALYZE
+        # =========================
+        if "analyze" in request.form and df is not None:
+
+            selected_columns = request.form.getlist("columns")
+            chart_type = request.form.get("chart_type", "bar")
+
+            if selected_columns:
+
+                numeric_data = df[selected_columns].apply(
+                    pd.to_numeric, errors="coerce"
+                )
+
+                stats = {}
+                for col in selected_columns:
+                    column_data = numeric_data[col].dropna()
+
+                    if not column_data.empty:
                         stats[col] = {
                             "average": round(column_data.mean(), 2),
                             "highest": column_data.max(),
                             "lowest": column_data.min()
                         }
 
-                    labels = df.index.astype(str).tolist()
-                    values = numeric_data.fillna(0).values.tolist()
+                labels = df.index.astype(str).tolist()
+                values = numeric_data.fillna(0).values.tolist()
 
-        # =====================
-        # Download
-        # =====================
-        if "download" in request.form:
-            file = request.files.get("csv_file")
+        # =========================
+        # DOWNLOAD
+        # =========================
+        if "download" in request.form and df is not None:
 
-            if file and file.filename != "":
-                df = pd.read_csv(file)
+            buffer = io.StringIO()
+            df.to_csv(buffer, index=False)
+            buffer.seek(0)
 
-                buffer = io.StringIO()
-                df.to_csv(buffer, index=False)
-                buffer.seek(0)
+            return send_file(
+                io.BytesIO(buffer.getvalue().encode()),
+                mimetype="text/csv",
+                as_attachment=True,
+                download_name="processed_data.csv"
+            )
 
-                return send_file(
-                    io.BytesIO(buffer.getvalue().encode()),
-                    mimetype="text/csv",
-                    as_attachment=True,
-                    download_name="processed_data.csv"
-                )
-
-    # Detect numeric columns only if df exists
+    # Detect numeric columns
     if df is not None:
         numeric_columns = df.select_dtypes(include=["number"]).columns.tolist()
         table = df.to_html(classes="table", index=False)
@@ -93,10 +102,14 @@ def index():
         selected_columns=selected_columns,
         chart_type=chart_type,
         labels=labels,
-        values=values
+        values=values,
+        error_message=error_message
     )
 
 
+# =========================
+# PRODUCTION PORT CONFIG
+# =========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)

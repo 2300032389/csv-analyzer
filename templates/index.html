@@ -3,6 +3,7 @@
 <head>
     <title>Universal CSV Analyzer</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -40,6 +41,11 @@
             border: none;
             border-radius: 8px;
             cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
         }
 
         table {
@@ -57,14 +63,32 @@
         th {
             background: rgba(255,255,255,0.1);
         }
+
+        h1 {
+            font-size: 32px;
+            margin-top: 20px;
+        }
+
+        .error-card {
+            background: rgba(255,0,0,0.2);
+        }
     </style>
 </head>
+
 <body>
 
 <div class="container">
 
 <h1>📊 Universal CSV Analyzer</h1>
 
+<!-- ERROR MESSAGE -->
+{% if error_message %}
+<div class="card error-card">
+    <p>{{ error_message }}</p>
+</div>
+{% endif %}
+
+<!-- Upload CSV -->
 <div class="card">
 <h2>Upload CSV</h2>
 <form method="POST" enctype="multipart/form-data">
@@ -73,10 +97,12 @@
 </form>
 </div>
 
+<!-- Column Selection -->
 {% if numeric_columns %}
 <div class="card">
-<h2>Analyze Columns</h2>
+<h2>Select Columns to Analyze</h2>
 <form method="POST" enctype="multipart/form-data">
+
     <input type="file" name="csv_file" accept=".csv" required>
 
     <br>
@@ -101,17 +127,22 @@
 </div>
 {% endif %}
 
+<!-- Statistics -->
 {% if stats %}
 <div class="card">
 <h2>Statistics</h2>
 {% for col, s in stats.items() %}
-<p><b>{{ col }}</b> → Avg: {{ s.average }},
+<p>
+<b>{{ col }}</b> → 
+Average: {{ s.average }},
 Highest: {{ s.highest }},
-Lowest: {{ s.lowest }}</p>
+Lowest: {{ s.lowest }}
+</p>
 {% endfor %}
 </div>
 {% endif %}
 
+<!-- Data Preview -->
 {% if table %}
 <div class="card">
 <h2>Data Preview</h2>
@@ -119,6 +150,7 @@ Lowest: {{ s.lowest }}</p>
 </div>
 {% endif %}
 
+<!-- Chart -->
 {% if values %}
 <div class="card">
 <h2>Visualization</h2>
