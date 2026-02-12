@@ -64,11 +64,6 @@
             background: rgba(255,255,255,0.1);
         }
 
-        h1 {
-            font-size: 32px;
-            margin-top: 20px;
-        }
-
         .error-card {
             background: rgba(255,0,0,0.2);
         }
@@ -88,25 +83,43 @@
 </div>
 {% endif %}
 
-<!-- UPLOAD CSV -->
+<!-- ========================= -->
+<!-- UPLOAD SECTION -->
+<!-- ========================= -->
+
+{% if not table %}
 <div class="card">
-<h2>Upload CSV</h2>
+<h2>Upload CSV File</h2>
 <form method="POST" enctype="multipart/form-data">
     <input type="file" name="csv_file" accept=".csv" required>
     <button name="upload_csv">Upload</button>
 </form>
 </div>
+{% endif %}
 
-{% if numeric_columns %}
+<!-- ========================= -->
+<!-- AFTER UPLOAD SECTION -->
+<!-- ========================= -->
+
+{% if table %}
+
+<div class="card">
+<h2>Actions</h2>
+
+<form method="POST" style="display:inline;">
+    <button name="reset" style="background:red;">Reset Data</button>
+</form>
+
+<form method="POST" style="display:inline;">
+    <button name="download">Download CSV</button>
+</form>
+
+</div>
 
 <!-- SORTING -->
 <div class="card">
 <h2>Sort Data</h2>
-<form method="POST" enctype="multipart/form-data">
-    <input type="file" name="csv_file" accept=".csv" required>
-
-    <br>
-
+<form method="POST">
     <label>Sort By:</label>
     <select name="sort_column">
         {% for col in numeric_columns %}
@@ -125,12 +138,8 @@
 
 <!-- ANALYSIS -->
 <div class="card">
-<h2>Select Columns to Analyze</h2>
-<form method="POST" enctype="multipart/form-data">
-
-    <input type="file" name="csv_file" accept=".csv" required>
-
-    <br>
+<h2>Analyze Columns</h2>
+<form method="POST">
 
     {% for col in numeric_columns %}
         <input type="checkbox" name="columns" value="{{ col }}"> {{ col }}
@@ -151,8 +160,6 @@
 </form>
 </div>
 
-{% endif %}
-
 <!-- STATISTICS -->
 {% if stats %}
 <div class="card">
@@ -169,12 +176,10 @@ Lowest: {{ s.lowest }}
 {% endif %}
 
 <!-- DATA PREVIEW -->
-{% if table %}
 <div class="card">
 <h2>Data Preview</h2>
 {{ table | safe }}
 </div>
-{% endif %}
 
 <!-- CHART -->
 {% if values %}
@@ -182,6 +187,8 @@ Lowest: {{ s.lowest }}
 <h2>Visualization</h2>
 <canvas id="myChart"></canvas>
 </div>
+{% endif %}
+
 {% endif %}
 
 </div>
