@@ -23,6 +23,7 @@ def index():
     kpis = None
     heatmap_labels = []
     heatmap_values = []
+    insights = None
 
     if request.method == "POST":
 
@@ -103,7 +104,9 @@ def index():
                 download_name="processed_data.csv"
             )
 
+    # ===== PREPARE DISPLAY DATA =====
     if df is not None:
+
         numeric_columns = df.select_dtypes(include=["number"]).columns.tolist()
         table = df.to_html(classes="table", index=False)
 
@@ -113,6 +116,37 @@ def index():
             "numeric_cols": len(numeric_columns),
             "missing": int(df.isnull().sum().sum())
         }
+
+        # ===== AUTOMATIC INSIGHTS =====
+        insights = {}
+
+        # 1️⃣ Column with most missing values
+        missing_series = df.isnull().sum()
+        max_missing_col = missing_series.idxmax()
+        max_missing_value = int(missing_series.max())
+
+        insights["most_missing"] = f"{max_missing_col} ({max_missing_value} missing values)"
+
+        # 2️⃣ Correlation insights
+        numeric_df = df.select_dtypes(include=[np.number])
+
+        if len(numeric_df.columns) > 1:
+            corr_matrix = numeric_df.corr()
+
+            # Remove self-correlation
+            corr_matrix.values[[np.arange(len(corr_matrix))]*2] = np.nan
+
+            max_corr = corr_matrix.unstack().dropna().idxmax()
+            min_corr = corr_matrix.unstack().dropna().idxmin()
+
+            insights["strongest_positive"] = f"{max_corr[0]} & {max_corr[1]}"
+            insights["strongest_negative"] = f"{min_corr[0]} & {min_corr[1]}"
+
+        # 3️⃣ Highest variance column
+        if len(numeric_df.columns) > 0:
+            variance_series = numeric_df.var()
+            max_variance_col = variance_series.idxmax()
+            insights["highest_variance"] = max_variance_col
 
     return render_template(
         "index.html",
@@ -125,7 +159,8 @@ def index():
         error_message=error_message,
         kpis=kpis,
         heatmap_labels=heatmap_labels,
-        heatmap_values=heatmap_values
+        heatmap_values=heatmap_values,
+        insights=insights
     )
 
 
