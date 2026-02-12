@@ -6,12 +6,21 @@ import numpy as np
 
 app = Flask(__name__)
 
-df = None
+UPLOAD_PATH = "/tmp/uploaded.csv"
+
+
+def load_df():
+    if os.path.exists(UPLOAD_PATH):
+        return pd.read_csv(UPLOAD_PATH)
+    return None
+
+
+def save_df(df):
+    df.to_csv(UPLOAD_PATH, index=False)
 
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    global df
 
     error_message = None
     table = None
@@ -20,13 +29,14 @@ def index():
     heatmap_labels = []
     heatmap_values = []
 
-    # Always initialize insights safely
     insights = {
         "most_missing": "Not available",
         "strongest_positive": "Not available",
         "strongest_negative": "Not available",
         "highest_variance": "Not available"
     }
+
+    df = load_df()
 
     if request.method == "POST":
 
@@ -43,17 +53,19 @@ def index():
                     if df.empty:
                         error_message = "Uploaded CSV is empty."
                         df = None
+                    else:
+                        save_df(df)
 
                 except Exception as e:
                     error_message = f"Invalid CSV file: {str(e)}"
-                    df = None
 
         # Reset
         if "reset" in request.form:
-            df = None
+            if os.path.exists(UPLOAD_PATH):
+                os.remove(UPLOAD_PATH)
             return redirect("/")
 
-        # ===== ADVANCED SORTING =====
+        # Sort
         if "sort" in request.form and df is not None:
 
             sort_type = request.form.get("sort_type")
@@ -77,7 +89,9 @@ def index():
                 df = df.sort_values(by="__row_max__", ascending=(order == "asc"))
                 df.drop(columns=["__row_max__"], inplace=True)
 
-        # ===== HEATMAP =====
+            save_df(df)
+
+        # Heatmap
         if "heatmap" in request.form and df is not None:
             numeric_df = df.select_dtypes(include=[np.number])
             if len(numeric_df.columns) > 1:
@@ -85,7 +99,7 @@ def index():
                 heatmap_labels = corr_matrix.columns.tolist()
                 heatmap_values = corr_matrix.values.tolist()
 
-        # ===== DOWNLOAD =====
+        # Download
         if "download" in request.form and df is not None:
             buffer = io.StringIO()
             df.to_csv(buffer, index=False)
@@ -98,7 +112,7 @@ def index():
                 download_name="processed_data.csv"
             )
 
-    # ===== DISPLAY DATA =====
+    # Display
     if df is not None:
 
         numeric_columns = df.select_dtypes(include=["number"]).columns.tolist()
@@ -111,9 +125,7 @@ def index():
             "missing": int(df.isnull().sum().sum())
         }
 
-        # ===== SAFE INSIGHTS =====
-
-        # Missing values insight
+        # Insights
         missing_series = df.isnull().sum()
         if not missing_series.empty:
             max_missing_col = missing_series.idxmax()
@@ -122,13 +134,9 @@ def index():
 
         numeric_df = df.select_dtypes(include=[np.number])
 
-        # Correlation insights (only if >1 numeric column)
         if len(numeric_df.columns) > 1:
             corr_matrix = numeric_df.corr()
-
-            # Remove self-correlation
             np.fill_diagonal(corr_matrix.values, np.nan)
-
             stacked = corr_matrix.unstack().dropna()
 
             if not stacked.empty:
@@ -138,7 +146,6 @@ def index():
                 insights["strongest_positive"] = f"{max_corr[0]} & {max_corr[1]}"
                 insights["strongest_negative"] = f"{min_corr[0]} & {min_corr[1]}"
 
-        # Variance insight
         if len(numeric_df.columns) > 0:
             variance_series = numeric_df.var()
             if not variance_series.empty:
@@ -157,6 +164,4 @@ def index():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
-
+    app.run(debug=True)
