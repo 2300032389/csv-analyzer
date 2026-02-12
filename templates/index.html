@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Advanced CSV Analyzer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial; background: #f4f6f9; text-align: center; }
+        .container { width: 90%; margin: auto; }
+        .card {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        input, select { padding: 8px; margin: 5px; }
+        button {
+            padding: 8px 15px;
+            margin: 5px;
+            background: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        table { margin: auto; border-collapse: collapse; }
+        th, td { padding: 10px; border: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>📊 Advanced Universal CSV Analyzer</h1>
+
+<!-- Upload -->
+<div class="card">
+<h2>Upload CSV</h2>
+<form method="POST" enctype="multipart/form-data">
+    <input type="file" name="csv_file" accept=".csv" required>
+    <button name="upload_csv">Upload</button>
+</form>
+</div>
+
+{% if numeric_columns %}
+<div class="card">
+<h2>Analyze Columns</h2>
+<form method="POST">
+
+    {% for col in numeric_columns %}
+        <input type="checkbox" name="columns" value="{{ col }}"> {{ col }}
+    {% endfor %}
+
+    <br><br>
+
+    <label>Chart Type:</label>
+    <select name="chart_type">
+        <option value="bar">Bar</option>
+        <option value="line">Line</option>
+        <option value="pie">Pie</option>
+    </select>
+
+    <br><br>
+
+    <button name="analyze">Analyze</button>
+</form>
+</div>
+
+<div class="card">
+<h2>Sort Data</h2>
+<form method="POST">
+    <select name="sort_column">
+        {% for col in numeric_columns %}
+        <option value="{{ col }}">{{ col }}</option>
+        {% endfor %}
+    </select>
+
+    <select name="order">
+        <option value="asc">Ascending</option>
+        <option value="desc">Descending</option>
+    </select>
+
+    <button name="sort">Sort</button>
+</form>
+</div>
+
+<div class="card">
+<form method="POST">
+    <button name="download">Download Processed CSV</button>
+</form>
+</div>
+
+{% endif %}
+
+{% if stats %}
+<div class="card">
+<h2>Statistics</h2>
+{% for col, s in stats.items() %}
+<p><b>{{ col }}</b> → Avg: {{ s.average }},
+Highest: {{ s.highest }},
+Lowest: {{ s.lowest }}</p>
+{% endfor %}
+</div>
+{% endif %}
+
+{% if table %}
+<div class="card">
+<h2>Data Preview</h2>
+{{ table | safe }}
+</div>
+{% endif %}
+
+{% if values %}
+<div class="card">
+<h2>Visualization</h2>
+<canvas id="myChart"></canvas>
+</div>
+{% endif %}
+
+</div>
+
+<script>
+    const labels = JSON.parse('{{ labels | tojson | safe }}');
+    const values = JSON.parse('{{ values | tojson | safe }}');
+    const chartType = "{{ chart_type }}";
+
+    if (values.length > 0) {
+
+        const datasets = [];
+
+        for (let i = 0; i < values[0].length; i++) {
+            datasets.push({
+                label: "Column " + (i + 1),
+                data: values.map(row => row[i]),
+                borderWidth: 1
+            });
+        }
+
+        new Chart(document.getElementById('myChart'), {
+            type: chartType,
+            data: {
+                labels: labels,
+                datasets: datasets
+            }
+        });
+    }
+</script>
+
+</body>
+</html>
