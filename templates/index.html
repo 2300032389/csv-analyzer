@@ -1,38 +1,70 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Advanced CSV Analyzer</title>
+    <title>Universal CSV Analyzer</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: Arial; background: #f4f6f9; text-align: center; }
-        .container { width: 90%; margin: auto; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #141e30, #243b55);
+            color: white;
+            text-align: center;
+        }
+
+        .container {
+            width: 90%;
+            margin: auto;
+        }
+
         .card {
-            background: white;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
             padding: 20px;
             margin: 20px 0;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
-        input, select { padding: 8px; margin: 5px; }
+
+        input, select {
+            padding: 8px;
+            margin: 5px;
+            border-radius: 8px;
+            border: none;
+        }
+
         button {
             padding: 8px 15px;
             margin: 5px;
-            background: #3498db;
+            background: linear-gradient(to right, #00c6ff, #0072ff);
             color: white;
             border: none;
+            border-radius: 8px;
             cursor: pointer;
         }
-        table { margin: auto; border-collapse: collapse; }
-        th, td { padding: 10px; border: 1px solid #ddd; }
+
+        table {
+            margin: auto;
+            border-collapse: collapse;
+            width: 100%;
+            color: white;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        th {
+            background: rgba(255,255,255,0.1);
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
 
-<h1>📊 Advanced Universal CSV Analyzer</h1>
+<h1>📊 Universal CSV Analyzer</h1>
 
-<!-- Upload -->
 <div class="card">
 <h2>Upload CSV</h2>
 <form method="POST" enctype="multipart/form-data">
@@ -44,7 +76,10 @@
 {% if numeric_columns %}
 <div class="card">
 <h2>Analyze Columns</h2>
-<form method="POST">
+<form method="POST" enctype="multipart/form-data">
+    <input type="file" name="csv_file" accept=".csv" required>
+
+    <br>
 
     {% for col in numeric_columns %}
         <input type="checkbox" name="columns" value="{{ col }}"> {{ col }}
@@ -64,31 +99,6 @@
     <button name="analyze">Analyze</button>
 </form>
 </div>
-
-<div class="card">
-<h2>Sort Data</h2>
-<form method="POST">
-    <select name="sort_column">
-        {% for col in numeric_columns %}
-        <option value="{{ col }}">{{ col }}</option>
-        {% endfor %}
-    </select>
-
-    <select name="order">
-        <option value="asc">Ascending</option>
-        <option value="desc">Descending</option>
-    </select>
-
-    <button name="sort">Sort</button>
-</form>
-</div>
-
-<div class="card">
-<form method="POST">
-    <button name="download">Download Processed CSV</button>
-</form>
-</div>
-
 {% endif %}
 
 {% if stats %}

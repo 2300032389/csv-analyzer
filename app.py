@@ -5,89 +5,85 @@ import os
 
 app = Flask(__name__)
 
-uploaded_data = None
-
 @app.route("/", methods=["GET", "POST"])
 def index():
-    global uploaded_data
 
-    stats = None
     table = None
+    stats = None
     numeric_columns = []
     selected_columns = []
     chart_type = "bar"
     labels = []
     values = []
 
+    df = None
+
     # =====================
-    # Upload CSV
+    # CSV Upload
     # =====================
     if request.method == "POST":
 
         if "upload_csv" in request.form:
-            file = request.files["csv_file"]
+            file = request.files.get("csv_file")
 
-            if file.filename != "":
+            if file and file.filename != "":
                 try:
-                    uploaded_data = pd.read_csv(file)
+                    df = pd.read_csv(file)
                 except Exception as e:
                     return f"Error reading file: {str(e)}"
 
         # =====================
         # Analyze
         # =====================
-        if "analyze" in request.form and uploaded_data is not None:
+        if "analyze" in request.form:
+            file = request.files.get("csv_file")
 
-            selected_columns = request.form.getlist("columns")
-            chart_type = request.form.get("chart_type")
+            if file and file.filename != "":
+                df = pd.read_csv(file)
 
-            if selected_columns:
+            if df is not None:
+                selected_columns = request.form.getlist("columns")
+                chart_type = request.form.get("chart_type", "bar")
 
-                numeric_data = uploaded_data[selected_columns].apply(pd.to_numeric, errors="coerce")
+                if selected_columns:
+                    numeric_data = df[selected_columns].apply(pd.to_numeric, errors="coerce")
 
-                stats = {}
-                for col in selected_columns:
-                    column_data = numeric_data[col].dropna()
-                    stats[col] = {
-                        "average": round(column_data.mean(), 2),
-                        "highest": column_data.max(),
-                        "lowest": column_data.min()
-                    }
+                    stats = {}
+                    for col in selected_columns:
+                        column_data = numeric_data[col].dropna()
+                        stats[col] = {
+                            "average": round(column_data.mean(), 2),
+                            "highest": column_data.max(),
+                            "lowest": column_data.min()
+                        }
 
-                labels = uploaded_data.index.astype(str).tolist()
-                values = numeric_data[selected_columns].fillna(0).values.tolist()
-
-        # =====================
-        # Sort
-        # =====================
-        if "sort" in request.form and uploaded_data is not None:
-            col = request.form["sort_column"]
-            order = request.form["order"]
-
-            uploaded_data[col] = pd.to_numeric(uploaded_data[col], errors="coerce")
-
-            uploaded_data = uploaded_data.sort_values(
-                by=col,
-                ascending=(order == "asc")
-            )
+                    labels = df.index.astype(str).tolist()
+                    values = numeric_data.fillna(0).values.tolist()
 
         # =====================
-        # Download CSV
+        # Download
         # =====================
-        if "download" in request.form and uploaded_data is not None:
-            buffer = io.StringIO()
-            uploaded_data.to_csv(buffer, index=False)
-            buffer.seek(0)
-            return send_file(
-                io.BytesIO(buffer.getvalue().encode()),
-                mimetype="text/csv",
-                as_attachment=True,
-                download_name="processed_data.csv"
-            )
+        if "download" in request.form:
+            file = request.files.get("csv_file")
 
-    if uploaded_data is not None:
-        table = uploaded_data.to_html(classes="table", index=False)
-        numeric_columns = uploaded_data.select_dtypes(include=["number"]).columns.tolist()
+            if file and file.filename != "":
+                df = pd.read_csv(file)
+
+                buffer = io.StringIO()
+                df.to_csv(buffer, index=False)
+                buffer.seek(0)
+
+                return send_file(
+                    io.BytesIO(buffer.getvalue().encode()),
+                    mimetype="text/csv",
+                    as_attachment=True,
+                    download_name="processed_data.csv"
+                )
+
+    # Detect numeric columns only if df exists
+    if df is not None:
+        numeric_columns = df.select_dtypes(include=["number"]).columns.tolist()
+        table = df.to_html(classes="table", index=False)
 
     return render_template(
         "index.html",
@@ -104,4 +100,3 @@ def index():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
