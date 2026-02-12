@@ -2,10 +2,10 @@ from flask import Flask, render_template, request, redirect, send_file
 import pandas as pd
 import io
 import os
+import numpy as np
 
 app = Flask(__name__)
 
-# Simple in-memory storage (single-user demo mode)
 df = None
 
 
@@ -21,6 +21,8 @@ def index():
     values = []
     chart_type = "bar"
     kpis = None
+    heatmap_labels = []
+    heatmap_values = []
 
     if request.method == "POST":
 
@@ -79,6 +81,15 @@ def index():
                 labels = df.index.astype(str).tolist()
                 values = numeric_data.fillna(0).values.tolist()
 
+        # Correlation Heatmap
+        if "heatmap" in request.form and df is not None:
+            numeric_df = df.select_dtypes(include=[np.number])
+
+            if not numeric_df.empty:
+                corr_matrix = numeric_df.corr().round(2)
+                heatmap_labels = corr_matrix.columns.tolist()
+                heatmap_values = corr_matrix.values.tolist()
+
         # Download
         if "download" in request.form and df is not None:
             buffer = io.StringIO()
@@ -92,7 +103,6 @@ def index():
                 download_name="processed_data.csv"
             )
 
-    # Prepare display data
     if df is not None:
         numeric_columns = df.select_dtypes(include=["number"]).columns.tolist()
         table = df.to_html(classes="table", index=False)
@@ -113,7 +123,9 @@ def index():
         values=values,
         chart_type=chart_type,
         error_message=error_message,
-        kpis=kpis
+        kpis=kpis,
+        heatmap_labels=heatmap_labels,
+        heatmap_values=heatmap_values
     )
 
 
