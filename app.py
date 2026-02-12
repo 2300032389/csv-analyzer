@@ -1,9 +1,11 @@
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, session
 import pandas as pd
 import io
 import os
+import base64
 
 app = Flask(__name__)
+app.secret_key = "supersecretkey"  # Required for session
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -19,31 +21,50 @@ def index():
 
     df = None
 
+    # =========================
+    # Load Data From Session
+    # =========================
+    if "csv_data" in session:
+        try:
+            decoded = base64.b64decode(session["csv_data"])
+            df = pd.read_csv(io.BytesIO(decoded))
+        except:
+            df = None
+
+    # =========================
+    # Handle POST
+    # =========================
     if request.method == "POST":
 
-        file = request.files.get("csv_file")
+        # Upload CSV
+        if "upload_csv" in request.form:
+            file = request.files.get("csv_file")
 
-        if not file or file.filename == "":
-            error_message = "Please upload a CSV file."
-        else:
-            try:
-                df = pd.read_csv(file)
+            if not file or file.filename == "":
+                error_message = "Please upload a CSV file."
+            else:
+                try:
+                    df = pd.read_csv(file)
 
-                if df.shape[1] == 0:
-                    error_message = "CSV file contains no columns."
+                    if df.shape[1] == 0:
+                        error_message = "CSV contains no columns."
+                        df = None
+                    else:
+                        # Save to session
+                        buffer = io.BytesIO()
+                        df.to_csv(buffer, index=False)
+                        session["csv_data"] = base64.b64encode(
+                            buffer.getvalue()
+                        ).decode()
+
+                except pd.errors.EmptyDataError:
+                    error_message = "Uploaded CSV is empty."
+                    df = None
+                except Exception as e:
+                    error_message = f"Invalid CSV: {str(e)}"
                     df = None
 
-            except pd.errors.EmptyDataError:
-                error_message = "Uploaded CSV is empty."
-                df = None
-
-            except Exception as e:
-                error_message = f"Invalid CSV file: {str(e)}"
-                df = None
-
-        # =========================
-        # SORTING
-        # =========================
+        # Sorting
         if "sort" in request.form and df is not None:
             sort_column = request.form.get("sort_column")
             sort_order = request.form.get("sort_order")
@@ -55,16 +76,12 @@ def index():
                     ascending=(sort_order == "asc")
                 )
 
-        # =========================
-        # ANALYZE
-        # =========================
+        # Analyze
         if "analyze" in request.form and df is not None:
-
             selected_columns = request.form.getlist("columns")
             chart_type = request.form.get("chart_type", "bar")
 
             if selected_columns:
-
                 numeric_data = df[selected_columns].apply(
                     pd.to_numeric, errors="coerce"
                 )
@@ -83,11 +100,8 @@ def index():
                 labels = df.index.astype(str).tolist()
                 values = numeric_data.fillna(0).values.tolist()
 
-        # =========================
-        # DOWNLOAD
-        # =========================
+        # Download
         if "download" in request.form and df is not None:
-
             buffer = io.StringIO()
             df.to_csv(buffer, index=False)
             buffer.seek(0)
@@ -99,6 +113,7 @@ def index():
                 download_name="processed_data.csv"
             )
 
+    # Detect numeric columns
     if df is not None:
         numeric_columns = df.select_dtypes(include=["number"]).columns.tolist()
         table = df.to_html(classes="table", index=False)
