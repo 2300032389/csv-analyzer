@@ -1,27 +1,17 @@
-from flask import Flask, render_template, request, redirect, session, send_file
+from flask import Flask, render_template, request, redirect
 import pandas as pd
 import io
 import os
-import uuid
 
 app = Flask(__name__)
-app.secret_key = "clean_final_version_key"
 
-# In-memory storage per user
-user_data = {}
-
-
-def get_user_id():
-    if "user_id" not in session:
-        session["user_id"] = str(uuid.uuid4())
-    return session["user_id"]
+# Simple in-memory storage (single-user demo mode)
+df = None
 
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-
-    user_id = get_user_id()
-    df = user_data.get(user_id)
+    global df
 
     error_message = None
     stats = None
@@ -33,7 +23,7 @@ def index():
 
     if request.method == "POST":
 
-        # Upload
+        # Upload CSV
         if "upload_csv" in request.form:
             file = request.files.get("csv_file")
 
@@ -46,16 +36,14 @@ def index():
                     if df.empty:
                         error_message = "Uploaded CSV is empty."
                         df = None
-                    else:
-                        user_data[user_id] = df
 
                 except Exception as e:
-                    error_message = f"Invalid CSV: {str(e)}"
+                    error_message = f"Invalid CSV file: {str(e)}"
                     df = None
 
         # Reset
         if "reset" in request.form:
-            user_data.pop(user_id, None)
+            df = None
             return redirect("/")
 
         # Sort
@@ -66,7 +54,6 @@ def index():
             if column in df.columns:
                 df[column] = pd.to_numeric(df[column], errors="coerce")
                 df = df.sort_values(by=column, ascending=(order == "asc"))
-                user_data[user_id] = df
 
         # Analyze
         if "analyze" in request.form and df is not None:
@@ -90,19 +77,6 @@ def index():
 
                 labels = df.index.astype(str).tolist()
                 values = numeric_data.fillna(0).values.tolist()
-
-        # Download
-        if "download" in request.form and df is not None:
-            buffer = io.StringIO()
-            df.to_csv(buffer, index=False)
-            buffer.seek(0)
-
-            return send_file(
-                io.BytesIO(buffer.getvalue().encode()),
-                mimetype="text/csv",
-                as_attachment=True,
-                download_name="processed_data.csv"
-            )
 
     if df is not None:
         numeric_columns = df.select_dtypes(include=["number"]).columns.tolist()
