@@ -1,38 +1,44 @@
-from flask import Flask, render_template, request, send_file, session
+from flask import Flask, render_template, request, redirect, session, send_file
 import pandas as pd
 import io
 import os
 import base64
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"  # Required for session
+app.secret_key = "placement_project_secret_key"
+
+
+def load_dataframe():
+    if "csv_data" in session:
+        try:
+            decoded = base64.b64decode(session["csv_data"])
+            return pd.read_csv(io.BytesIO(decoded))
+        except:
+            return None
+    return None
+
+
+def save_dataframe(df):
+    buffer = io.BytesIO()
+    df.to_csv(buffer, index=False)
+    session["csv_data"] = base64.b64encode(buffer.getvalue()).decode()
+
 
 @app.route("/", methods=["GET", "POST"])
 def index():
 
-    table = None
+    error_message = None
     stats = None
+    table = None
     numeric_columns = []
-    selected_columns = []
-    chart_type = "bar"
     labels = []
     values = []
-    error_message = None
+    chart_type = "bar"
 
-    df = None
-
-    # =========================
-    # Load Data From Session
-    # =========================
-    if "csv_data" in session:
-        try:
-            decoded = base64.b64decode(session["csv_data"])
-            df = pd.read_csv(io.BytesIO(decoded))
-        except:
-            df = None
+    df = load_dataframe()
 
     # =========================
-    # Handle POST
+    # HANDLE POST ACTIONS
     # =========================
     if request.method == "POST":
 
@@ -46,35 +52,30 @@ def index():
                 try:
                     df = pd.read_csv(file)
 
-                    if df.shape[1] == 0:
-                        error_message = "CSV contains no columns."
+                    if df.empty:
+                        error_message = "Uploaded CSV is empty."
                         df = None
                     else:
-                        # Save to session
-                        buffer = io.BytesIO()
-                        df.to_csv(buffer, index=False)
-                        session["csv_data"] = base64.b64encode(
-                            buffer.getvalue()
-                        ).decode()
+                        save_dataframe(df)
 
-                except pd.errors.EmptyDataError:
-                    error_message = "Uploaded CSV is empty."
-                    df = None
                 except Exception as e:
-                    error_message = f"Invalid CSV: {str(e)}"
+                    error_message = f"Invalid CSV file: {str(e)}"
                     df = None
 
-        # Sorting
-        if "sort" in request.form and df is not None:
-            sort_column = request.form.get("sort_column")
-            sort_order = request.form.get("sort_order")
+        # Reset Data
+        if "reset" in request.form:
+            session.pop("csv_data", None)
+            return redirect("/")
 
-            if sort_column in df.columns:
-                df[sort_column] = pd.to_numeric(df[sort_column], errors="coerce")
-                df = df.sort_values(
-                    by=sort_column,
-                    ascending=(sort_order == "asc")
-                )
+        # Sort
+        if "sort" in request.form and df is not None:
+            column = request.form.get("sort_column")
+            order = request.form.get("sort_order")
+
+            if column in df.columns:
+                df[column] = pd.to_numeric(df[column], errors="coerce")
+                df = df.sort_values(by=column, ascending=(order == "asc"))
+                save_dataframe(df)
 
         # Analyze
         if "analyze" in request.form and df is not None:
@@ -89,7 +90,6 @@ def index():
                 stats = {}
                 for col in selected_columns:
                     column_data = numeric_data[col].dropna()
-
                     if not column_data.empty:
                         stats[col] = {
                             "average": round(column_data.mean(), 2),
@@ -113,7 +113,7 @@ def index():
                 download_name="processed_data.csv"
             )
 
-    # Detect numeric columns
+    # Prepare data for display
     if df is not None:
         numeric_columns = df.select_dtypes(include=["number"]).columns.tolist()
         table = df.to_html(classes="table", index=False)
@@ -123,10 +123,9 @@ def index():
         table=table,
         stats=stats,
         numeric_columns=numeric_columns,
-        selected_columns=selected_columns,
-        chart_type=chart_type,
         labels=labels,
         values=values,
+        chart_type=chart_type,
         error_message=error_message
     )
 
