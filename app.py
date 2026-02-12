@@ -14,16 +14,19 @@ def index():
     global df
 
     error_message = None
-    stats = None
     table = None
     numeric_columns = []
-    labels = []
-    values = []
-    chart_type = "bar"
     kpis = None
     heatmap_labels = []
     heatmap_values = []
-    insights = None
+
+    # Always initialize insights safely
+    insights = {
+        "most_missing": "Not available",
+        "strongest_positive": "Not available",
+        "strongest_negative": "Not available",
+        "highest_variance": "Not available"
+    }
 
     if request.method == "POST":
 
@@ -74,15 +77,15 @@ def index():
                 df = df.sort_values(by="__row_max__", ascending=(order == "asc"))
                 df.drop(columns=["__row_max__"], inplace=True)
 
-        # Heatmap
+        # ===== HEATMAP =====
         if "heatmap" in request.form and df is not None:
             numeric_df = df.select_dtypes(include=[np.number])
-            if not numeric_df.empty:
+            if len(numeric_df.columns) > 1:
                 corr_matrix = numeric_df.corr().round(2)
                 heatmap_labels = corr_matrix.columns.tolist()
                 heatmap_values = corr_matrix.values.tolist()
 
-        # Download
+        # ===== DOWNLOAD =====
         if "download" in request.form and df is not None:
             buffer = io.StringIO()
             df.to_csv(buffer, index=False)
@@ -108,26 +111,38 @@ def index():
             "missing": int(df.isnull().sum().sum())
         }
 
-        # ===== INSIGHTS =====
-        insights = {}
+        # ===== SAFE INSIGHTS =====
 
+        # Missing values insight
         missing_series = df.isnull().sum()
-        max_missing_col = missing_series.idxmax()
-        insights["most_missing"] = f"{max_missing_col} ({int(missing_series.max())})"
+        if not missing_series.empty:
+            max_missing_col = missing_series.idxmax()
+            max_missing_value = int(missing_series.max())
+            insights["most_missing"] = f"{max_missing_col} ({max_missing_value})"
 
         numeric_df = df.select_dtypes(include=[np.number])
 
+        # Correlation insights (only if >1 numeric column)
         if len(numeric_df.columns) > 1:
             corr_matrix = numeric_df.corr()
-            corr_matrix.values[[np.arange(len(corr_matrix))]*2] = np.nan
-            max_corr = corr_matrix.unstack().dropna().idxmax()
-            min_corr = corr_matrix.unstack().dropna().idxmin()
-            insights["strongest_positive"] = f"{max_corr[0]} & {max_corr[1]}"
-            insights["strongest_negative"] = f"{min_corr[0]} & {min_corr[1]}"
 
+            # Remove self-correlation
+            np.fill_diagonal(corr_matrix.values, np.nan)
+
+            stacked = corr_matrix.unstack().dropna()
+
+            if not stacked.empty:
+                max_corr = stacked.idxmax()
+                min_corr = stacked.idxmin()
+
+                insights["strongest_positive"] = f"{max_corr[0]} & {max_corr[1]}"
+                insights["strongest_negative"] = f"{min_corr[0]} & {min_corr[1]}"
+
+        # Variance insight
         if len(numeric_df.columns) > 0:
             variance_series = numeric_df.var()
-            insights["highest_variance"] = variance_series.idxmax()
+            if not variance_series.empty:
+                insights["highest_variance"] = variance_series.idxmax()
 
     return render_template(
         "index.html",
