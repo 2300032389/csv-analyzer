@@ -5,16 +5,17 @@ import uuid
 import io
 
 app = Flask(__name__)
-app.secret_key = "placement_ready_project_key"
+app.secret_key = "placement_final_version_key"
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
-def get_user_file():
-    if "file_id" in session:
-        return os.path.join(UPLOAD_FOLDER, f"{session['file_id']}.csv")
-    return None
+def get_file_path():
+    file_id = session.get("file_id")
+    if not file_id:
+        return None
+    return os.path.join(UPLOAD_FOLDER, f"{file_id}.csv")
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -28,13 +29,16 @@ def index():
     values = []
     chart_type = "bar"
 
-    file_path = get_user_file()
+    file_path = get_file_path()
     df = None
 
-    # Load existing user file
+    # Load user file ONLY if session has file_id
     if file_path and os.path.exists(file_path):
         df = pd.read_csv(file_path)
 
+    # =========================
+    # POST ACTIONS
+    # =========================
     if request.method == "POST":
 
         # Upload CSV
@@ -51,6 +55,12 @@ def index():
                         error_message = "Uploaded CSV is empty."
                         df = None
                     else:
+                        # Clear old file if exists
+                        old_path = get_file_path()
+                        if old_path and os.path.exists(old_path):
+                            os.remove(old_path)
+
+                        # Save new file
                         file_id = str(uuid.uuid4())
                         session["file_id"] = file_id
                         file_path = os.path.join(UPLOAD_FOLDER, f"{file_id}.csv")
@@ -64,7 +74,7 @@ def index():
         if "reset" in request.form:
             if file_path and os.path.exists(file_path):
                 os.remove(file_path)
-            session.pop("file_id", None)
+            session.clear()
             return redirect("/")
 
         # Sort
@@ -113,6 +123,7 @@ def index():
                 download_name="processed_data.csv"
             )
 
+    # Display only if user has uploaded
     if df is not None:
         numeric_columns = df.select_dtypes(include=["number"]).columns.tolist()
         table = df.to_html(classes="table", index=False)
