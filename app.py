@@ -1,25 +1,27 @@
 from flask import Flask, render_template, request, redirect, session, send_file
 import pandas as pd
+import io
 import os
 import uuid
-import io
 
 app = Flask(__name__)
-app.secret_key = "placement_final_version_key"
+app.secret_key = "clean_final_version_key"
 
-UPLOAD_FOLDER = "uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# In-memory storage per user
+user_data = {}
 
 
-def get_file_path():
-    file_id = session.get("file_id")
-    if not file_id:
-        return None
-    return os.path.join(UPLOAD_FOLDER, f"{file_id}.csv")
+def get_user_id():
+    if "user_id" not in session:
+        session["user_id"] = str(uuid.uuid4())
+    return session["user_id"]
 
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+
+    user_id = get_user_id()
+    df = user_data.get(user_id)
 
     error_message = None
     stats = None
@@ -29,19 +31,9 @@ def index():
     values = []
     chart_type = "bar"
 
-    file_path = get_file_path()
-    df = None
-
-    # Load user file ONLY if session has file_id
-    if file_path and os.path.exists(file_path):
-        df = pd.read_csv(file_path)
-
-    # =========================
-    # POST ACTIONS
-    # =========================
     if request.method == "POST":
 
-        # Upload CSV
+        # Upload
         if "upload_csv" in request.form:
             file = request.files.get("csv_file")
 
@@ -55,16 +47,7 @@ def index():
                         error_message = "Uploaded CSV is empty."
                         df = None
                     else:
-                        # Clear old file if exists
-                        old_path = get_file_path()
-                        if old_path and os.path.exists(old_path):
-                            os.remove(old_path)
-
-                        # Save new file
-                        file_id = str(uuid.uuid4())
-                        session["file_id"] = file_id
-                        file_path = os.path.join(UPLOAD_FOLDER, f"{file_id}.csv")
-                        df.to_csv(file_path, index=False)
+                        user_data[user_id] = df
 
                 except Exception as e:
                     error_message = f"Invalid CSV: {str(e)}"
@@ -72,9 +55,7 @@ def index():
 
         # Reset
         if "reset" in request.form:
-            if file_path and os.path.exists(file_path):
-                os.remove(file_path)
-            session.clear()
+            user_data.pop(user_id, None)
             return redirect("/")
 
         # Sort
@@ -85,7 +66,7 @@ def index():
             if column in df.columns:
                 df[column] = pd.to_numeric(df[column], errors="coerce")
                 df = df.sort_values(by=column, ascending=(order == "asc"))
-                df.to_csv(file_path, index=False)
+                user_data[user_id] = df
 
         # Analyze
         if "analyze" in request.form and df is not None:
@@ -123,7 +104,6 @@ def index():
                 download_name="processed_data.csv"
             )
 
-    # Display only if user has uploaded
     if df is not None:
         numeric_columns = df.select_dtypes(include=["number"]).columns.tolist()
         table = df.to_html(classes="table", index=False)
