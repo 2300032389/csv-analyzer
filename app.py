@@ -96,12 +96,15 @@ def index():
             save_df(df)
 
         # Heatmap
-        if "heatmap" in request.form and df is not None:
-            numeric_df = df.select_dtypes(include=[np.number])
-            if len(numeric_df.columns) > 1:
-                corr = numeric_df.corr().round(2)
-                heatmap_labels = corr.columns.tolist()
-                heatmap_values = corr.values.tolist()
+        # Heatmap
+    if "heatmap" in request.form and df is not None:
+        numeric_df = df.apply(pd.to_numeric, errors='coerce')
+        numeric_df = numeric_df.dropna(axis=1, how='all')
+        if len(numeric_df.columns) > 1:
+            corr = numeric_df.corr().round(2)
+            heatmap_labels = corr.columns.tolist()
+            heatmap_values = corr.values.tolist()
+
 
         # Download
         if "download" in request.form and df is not None:
