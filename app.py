@@ -1,17 +1,20 @@
 from flask import Flask, render_template, request, redirect, send_file
 import pandas as pd
+import numpy as np
 import io
 import os
-import numpy as np
 
 app = Flask(__name__)
 
-UPLOAD_PATH = "/tmp/uploaded.csv"
+UPLOAD_PATH = "uploaded.csv"
 
 
 def load_df():
     if os.path.exists(UPLOAD_PATH):
-        return pd.read_csv(UPLOAD_PATH)
+        try:
+            return pd.read_csv(UPLOAD_PATH)
+        except:
+            return None
     return None
 
 
@@ -44,20 +47,20 @@ def index():
         if "upload_csv" in request.form:
             file = request.files.get("csv_file")
 
-            if not file or file.filename == "":
+            if not file:
                 error_message = "Please upload a CSV file."
             else:
                 try:
                     df = pd.read_csv(file)
 
                     if df.empty:
-                        error_message = "Uploaded CSV is empty."
+                        error_message = "CSV is empty."
                         df = None
                     else:
                         save_df(df)
 
                 except Exception as e:
-                    error_message = f"Invalid CSV file: {str(e)}"
+                    error_message = f"Invalid CSV: {str(e)}"
 
         # Reset
         if "reset" in request.form:
@@ -65,29 +68,30 @@ def index():
                 os.remove(UPLOAD_PATH)
             return redirect("/")
 
+        # Reload after possible upload
+        df = load_df()
+
         # Sort
         if "sort" in request.form and df is not None:
 
             sort_type = request.form.get("sort_type")
             order = request.form.get("sort_order")
-
             numeric_df = df.select_dtypes(include=[np.number])
 
             if sort_type == "column":
                 column = request.form.get("sort_column")
                 if column in df.columns:
-                    df[column] = pd.to_numeric(df[column], errors="coerce")
                     df = df.sort_values(by=column, ascending=(order == "asc"))
 
             elif sort_type == "row_avg" and not numeric_df.empty:
-                df["__row_avg__"] = numeric_df.mean(axis=1)
-                df = df.sort_values(by="__row_avg__", ascending=(order == "asc"))
-                df.drop(columns=["__row_avg__"], inplace=True)
+                df["__avg__"] = numeric_df.mean(axis=1)
+                df = df.sort_values(by="__avg__", ascending=(order == "asc"))
+                df.drop(columns=["__avg__"], inplace=True)
 
             elif sort_type == "row_max" and not numeric_df.empty:
-                df["__row_max__"] = numeric_df.max(axis=1)
-                df = df.sort_values(by="__row_max__", ascending=(order == "asc"))
-                df.drop(columns=["__row_max__"], inplace=True)
+                df["__max__"] = numeric_df.max(axis=1)
+                df = df.sort_values(by="__max__", ascending=(order == "asc"))
+                df.drop(columns=["__max__"], inplace=True)
 
             save_df(df)
 
@@ -95,9 +99,9 @@ def index():
         if "heatmap" in request.form and df is not None:
             numeric_df = df.select_dtypes(include=[np.number])
             if len(numeric_df.columns) > 1:
-                corr_matrix = numeric_df.corr().round(2)
-                heatmap_labels = corr_matrix.columns.tolist()
-                heatmap_values = corr_matrix.values.tolist()
+                corr = numeric_df.corr().round(2)
+                heatmap_labels = corr.columns.tolist()
+                heatmap_values = corr.values.tolist()
 
         # Download
         if "download" in request.form and df is not None:
@@ -112,7 +116,9 @@ def index():
                 download_name="processed_data.csv"
             )
 
-    # Display
+    # ===== DISPLAY DATA =====
+    df = load_df()
+
     if df is not None:
 
         numeric_columns = df.select_dtypes(include=["number"]).columns.tolist()
